@@ -1498,6 +1498,8 @@ in Fig. \ref{fig:DisplayMenu}.
 \label{fig:DisplayMenu}
 \end{figure}
 
+\subsection{Display Menu: General}
+
 \rett{Frames Per Second:} This adjust how often the RX display is re-drawn.
 10 frames per second (the default) is a good value.
 
@@ -1553,6 +1555,26 @@ on the RX panels. With the pan-adapter enabled, you can have the waterfall alone
  there will simply be a large ,,hole'' in the \pH window. This makes little sense
  except on machines with very weak CPUs, since \textit{not} displaying neither waterfall
  nor pan-adapter saves some CPU time in the graphics back-end.
+
+\subsection{Display Menu: Peaks}
+
+\rett{Show Peak Numbers on Panadapter:} This enables peak detection.
+
+\rett{Show Peaks in Passband Only:} If the box is checked only the peaks in the 
+chosen filter passband 
+are shown.
+
+\rett{Hide Peaks Below Noise Floor:} This hides the peaks below the noise floor.
+
+\rett{Peaks to Show:} This determines how many peaks will be shown. There can always be less,
+ but no more than this number.
+
+\rett{Panadapter Ignore Adjacent Peaks:} This number determines if nearby peaks are shown or are
+ supressed. The higher the number the closer the peaks can be to eachother. It's a divisor of the 
+ full window width so setting it to 1 will mean only one peak can occupy the entire window,
+
+\rett{Panadapter Noise Floor Percentile:} This is the percentile setting that defines the noise floor. 
+If the \rett{Hide Peaks Below Noise Floor} box is ticked peaks below this value will not be shown.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2478,6 +2500,26 @@ new triggering audio arrives within that time, the gate is closed and the noise 
 \rett{Filter Low-Cut (Hz)} and \rett{Filter  High-Cut (Hz)} specify the frequency edges of the side
 channel filter (if it is enabled). The defaults given here (1000--2000 Hz) are well suited  for distinguishing
 human voice from humming noise coming from fans etc.
+
+\subsection{TX Menu: Peaks}
+
+\rett{Show Peak Numbers on Panadapter:} This enables peak detection.
+
+\rett{Show Peaks in Passband Only:} If the box is checked only the peaks in the 
+chosen filter passband 
+are shown.
+
+\rett{Hide Peaks Below Noise Floor:} This hides the peaks below the noise floor.
+
+\rett{Peaks to Show:} This determines how many peaks will be shown. There can always be less,
+ but no more than this number.
+
+\rett{Panadapter Ignore Adjacent Peaks:} This number determines if nearby peaks are shown or are
+ supressed. The higher the number the closer the peaks can be to eachother. It's a divisor of the 
+ full window width so setting it to 1 will mean only one peak can occupy the entire window,
+
+\rett{Panadapter Noise Floor Percentile:} This is the percentile setting that defines the noise floor. 
+If the \rett{Hide Peaks Below Noise Floor} box is ticked peaks below this value will not be shown.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{The \texttt{PA} Menu}
 
