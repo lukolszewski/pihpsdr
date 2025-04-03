@@ -66,7 +66,6 @@ static void get_info(char *driver) {
     sdrplay_val = sdrplay_count;
     sdrplay_count++;
   }
-
   SoapySDRDevice *sdr = SoapySDRDevice_make(&args);
   SoapySDRKwargs_clear(&args);
   software_version = 0;
@@ -254,14 +253,30 @@ static void get_info(char *driver) {
     discovered[devices].info.soapy.rx_channels = rx_channels;
     discovered[devices].info.soapy.rx_gains = rx_gains_length;
     discovered[devices].info.soapy.rx_gain = rx_gains;
-    discovered[devices].info.soapy.rx_range = malloc(rx_gains_length * sizeof(SoapySDRRange));
+    if (strcmp(driver, "lime") == 0) {
+      discovered[devices].info.soapy.rx_range = malloc((rx_gains_length + 1) * sizeof(SoapySDRRange));
+      
+      SoapySDRRange overall_range = SoapySDRDevice_getGainRange(sdr, SOAPY_SDR_RX, 0);
+      t_print("RX gain available: overall, %f -> %f step=%f\n", overall_range.minimum, overall_range.maximum, overall_range.step);
+      discovered[devices].info.soapy.rx_range[0] = overall_range;
 
-    for (size_t i = 0; i < rx_gains_length; i++) {
-      t_print("RX gain %s\n", rx_gains[i]);
-      SoapySDRRange rx_range = SoapySDRDevice_getGainElementRange(sdr, SOAPY_SDR_RX, 0, rx_gains[i]);
-      t_print("RX gain available: %s, %f -> %f step=%f\n", rx_gains[i], rx_range.minimum, rx_range.maximum, rx_range.step);
-      discovered[devices].info.soapy.rx_range[i] = rx_range;
+      for (size_t i = 0; i < rx_gains_length; i++) {
+        t_print("RX gain %s\n", rx_gains[i]);
+        SoapySDRRange rx_range = SoapySDRDevice_getGainElementRange(sdr, SOAPY_SDR_RX, 0, rx_gains[i]);
+        t_print("RX gain available: %s, %f -> %f step=%f\n", rx_gains[i], rx_range.minimum, rx_range.maximum, rx_range.step);
+        discovered[devices].info.soapy.rx_range[i+1] = rx_range;
+      }
+    }else{
+      discovered[devices].info.soapy.rx_range = malloc(rx_gains_length * sizeof(SoapySDRRange));
+
+      for (size_t i = 0; i < rx_gains_length; i++) {
+        t_print("RX gain %s\n", rx_gains[i]);
+        SoapySDRRange rx_range = SoapySDRDevice_getGainElementRange(sdr, SOAPY_SDR_RX, 0, rx_gains[i]);
+        t_print("RX gain available: %s, %f -> %f step=%f\n", rx_gains[i], rx_range.minimum, rx_range.maximum, rx_range.step);
+        discovered[devices].info.soapy.rx_range[i] = rx_range;
+      }
     }
+    
 
     discovered[devices].info.soapy.rx_has_automatic_gain = has_automatic_gain;
     discovered[devices].info.soapy.rx_has_automatic_dc_offset_correction = has_automatic_dc_offset_correction;

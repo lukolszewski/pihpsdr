@@ -239,6 +239,7 @@ extern void   tx_set_pre_emphasize(const TRANSMITTER *tx);
 extern void   tx_set_ramps(TRANSMITTER *tx);
 extern void   tx_set_singletone(const TRANSMITTER *tx, int state, double freq);
 extern void   tx_set_twotone(TRANSMITTER *tx, int state);
+extern void   tx_frequency_changed(TRANSMITTER *tx);
 
 #endif
 

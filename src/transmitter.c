@@ -1896,6 +1896,15 @@ void tx_set_analyzer(const TRANSMITTER *tx) {
 }
 
 void tx_off(const TRANSMITTER *tx) {
+
+  #ifdef SOAPYSDR
+  const char *bank = "MAIN";
+  t_print("Transmitter:Setting GPIO to 0");
+  SoapySDRDevice *sdr = get_soapy_device();
+  SoapySDRDevice_writeGPIODir(sdr,bank,0xFF);
+  SoapySDRDevice_writeGPIO(sdr,bank, 0x00);
+  #endif
+
   // switch TX OFF, wait until slew-down completed
   SetChannelState(tx->id, 0, 1);
 #ifdef WDSPTXDEBUG
@@ -1904,6 +1913,26 @@ void tx_off(const TRANSMITTER *tx) {
 }
 
 void tx_on(const TRANSMITTER *tx) {
+
+#ifdef SOAPYSDR
+  SoapySDRDevice *sdr = get_soapy_device();
+  const char *bank = "MAIN";
+
+  //size_t length = 0;
+  //char **banks = SoapySDRDevice_listGPIOBanks(sdr, &length);
+  //t_print("List GPIO banks:");
+  //for (size_t i = 0; i < length; ++i)
+  //  {
+  //      t_print(banks[i]);
+  //  }
+  //SoapySDRStrings_clear(banks, length);
+  t_print("Transmitter:Setting GPIO to 1");
+  
+  SoapySDRDevice_writeGPIODir(sdr,bank,0xFF);
+  SoapySDRDevice_writeGPIO(sdr,bank, 0x01);
+  usleep(30000);
+#endif
+
   // switch TX ON
   SetChannelState(tx->id, 1, 0);
 #ifdef WDSPTXDEBUG
@@ -2387,3 +2416,11 @@ void tx_set_twotone(TRANSMITTER *tx, int state) {
   g_idle_add(ext_mox_update, GINT_TO_POINTER(state));
 }
 
+void tx_frequency_changed(TRANSMITTER *tx) {
+
+  #if SOAPYSDR
+  if(protocol == SOAPYSDR_PROTOCOL) {
+    soapy_protocol_set_tx_frequency(tx);
+  }
+  #endif
+}
