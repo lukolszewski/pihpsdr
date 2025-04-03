@@ -548,6 +548,20 @@ void soapy_protocol_set_gain(RECEIVER *rx) {
   }
 }
 
+void soapy_protocol_attenuate(RECEIVER *rx) {
+  int rc;
+  //t_print("soapy_protocol_set_gain: adc=%d gain=%f\n",gain);
+  rc = SoapySDRDevice_setGain(soapy_device, SOAPY_SDR_RX, rx->adc, adc[rx->adc].min_gain);
+
+  if (rc != 0) {
+    t_print("soapy_protocol: SoapySDRDevice_setGain failed: %s\n", SoapySDR_errToStr(rc));
+  }
+}
+
+void soapy_protocol_unattenuate(RECEIVER *rx) {
+  soapy_protocol_set_gain(rx);
+}
+
 void soapy_protocol_set_gain_element(const RECEIVER *rx, char *name, int gain) {
   int rc;
   t_print("%s: adc=%d %s=%d\n", __FUNCTION__, rx->adc, name, gain);

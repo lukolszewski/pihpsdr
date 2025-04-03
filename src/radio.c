@@ -1541,7 +1541,8 @@ void radio_start_radio() {
     if (can_transmit) {
       soapy_protocol_create_transmitter(transmitter);
       soapy_protocol_set_tx_antenna(transmitter, dac[0].antenna);
-      soapy_protocol_set_tx_gain(transmitter, transmitter->drive);
+      //soapy_protocol_set_tx_gain(transmitter, transmitter->drive);
+      soapy_protocol_set_tx_gain(transmitter, 0);
       soapy_protocol_set_tx_frequency(transmitter);
       soapy_protocol_start_transmitter(transmitter);
     }
@@ -2292,7 +2293,9 @@ void radio_set_drive(double value) {
 #ifdef SOAPYSDR
 
   case SOAPYSDR_PROTOCOL:
+  if(mox) {
     soapy_protocol_set_tx_gain(transmitter, transmitter->drive);
+  }
     break;
 #endif
   }

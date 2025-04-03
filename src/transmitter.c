@@ -1897,22 +1897,34 @@ void tx_set_analyzer(const TRANSMITTER *tx) {
 
 void tx_off(const TRANSMITTER *tx) {
 
-  #ifdef SOAPYSDR
-  const char *bank = "MAIN";
-  t_print("Transmitter:Setting GPIO to 0");
-  SoapySDRDevice *sdr = get_soapy_device();
-  SoapySDRDevice_writeGPIODir(sdr,bank,0xFF);
-  SoapySDRDevice_writeGPIO(sdr,bank, 0x00);
-  #endif
-
   // switch TX OFF, wait until slew-down completed
   SetChannelState(tx->id, 0, 1);
 #ifdef WDSPTXDEBUG
   t_print("WDSP:TX id=%d Channel OFF\n", tx->id);
 #endif
+
+#ifdef SOAPYSDR
+  soapy_protocol_set_tx_gain(transmitter, 0);
+
+  const char *bank = "MAIN";
+  t_print("Transmitter:Setting GPIO to 0");
+  SoapySDRDevice *sdr = get_soapy_device();
+  SoapySDRDevice_writeGPIODir(sdr,bank,0xFF);
+  SoapySDRDevice_writeGPIO(sdr,bank, 0x00);
+#endif
+
+for (int i = 0; i < RECEIVERS; i++) {
+    soapy_protocol_unattenuate(receiver[i]);
+}
+
 }
 
 void tx_on(const TRANSMITTER *tx) {
+
+
+for (int i = 0; i < RECEIVERS; i++) {
+    soapy_protocol_attenuate(receiver[i]);
+}
 
 #ifdef SOAPYSDR
   SoapySDRDevice *sdr = get_soapy_device();
@@ -1931,6 +1943,7 @@ void tx_on(const TRANSMITTER *tx) {
   SoapySDRDevice_writeGPIODir(sdr,bank,0xFF);
   SoapySDRDevice_writeGPIO(sdr,bank, 0x01);
   usleep(30000);
+  soapy_protocol_set_tx_gain(transmitter, transmitter->drive);
 #endif
 
   // switch TX ON
