@@ -1852,7 +1852,6 @@ int tx_get_pixels(TRANSMITTER *tx) {
 
 void tx_set_analyzer(const TRANSMITTER *tx) {
   int flp[] = {0};
-  const double keep_time = 0.1;
   const int n_pixout = 1;
   const int spur_elimination_ffts = 1;
   const int data_type = 1;
@@ -1863,30 +1862,42 @@ void tx_set_analyzer(const TRANSMITTER *tx) {
   const int calibration_data_set = 0;
   const double span_min_freq = 0.0;
   const double span_max_freq = 0.0;
-  const int clip = 0;
   const int window_type = 5;
   
   // Default parameters (used for all protocols except SOAPY)
   int afft_size = 16384;
-  int overlap = (int)max(0.0, ceil(afft_size - (double)tx->iq_output_rate / (double)tx->fps));
-  int max_w = afft_size + (int)min(keep_time * (double)tx->iq_output_rate, 
-                                   keep_time * (double)afft_size * (double)tx->fps);
+  int overlap;
+  int max_w;
+  int clip = 0;
+  
+  // Calculate base overlap for standard protocols
+  overlap = (int)max(0.0, ceil(afft_size - (double)tx->iq_output_rate / (double)tx->fps));
+  max_w = afft_size + (int)min(0.1 * (double)tx->iq_output_rate, 0.1 * (double)afft_size * (double)tx->fps);
   
   // Override parameters for SOAPY SDR
   #ifdef SOAPYSDR
-  t_print("Setting SOAPY TX Analyzer");
   if (protocol == SOAPYSDR_PROTOCOL) {
-    // Use much larger FFT size for SOAPY's higher bandwidth
-    afft_size = 65536;  // 4x larger than default
+    // Calculate how many new samples we get between frames
+    int samples_per_frame = tx->iq_output_rate / tx->fps;
     
-    // Use higher percentage overlap for SOAPY
-    overlap = (int)(0.75 * afft_size);
+    // For SOAPY, use FFT size that's a power of 2 and at least 4x samples_per_frame
+    // Find next power of 2 above 4*samples_per_frame
+    afft_size = 8192; // Minimum size
+    while (afft_size < 4 * samples_per_frame) {
+      afft_size *= 2;
+    }
     
-    // Larger window for SOAPY's higher sample rate
+    // Calculate overlap to process exactly one frame's worth of new samples
+    overlap = afft_size - samples_per_frame;
+    
+    // Clip to reduce spectral leakage at the edges
+    clip = afft_size / 16;
+    
+    // Use larger buffer to ensure we have enough samples
     max_w = afft_size * 2;
     
-    t_print("WDSP:TX SetAnalyzer for SOAPY id=%d buffer_size=%d overlap=%d pixels=%d afft_size=%d\n", 
-            tx->id, tx->output_samples, overlap, tx->pixels, afft_size);
+    t_print("WDSP:TX SetAnalyzer for SOAPY id=%d buffer_size=%d samples_per_frame=%d overlap=%d pixels=%d afft_size=%d clip=%d\n", 
+            tx->id, tx->output_samples, samples_per_frame, overlap, tx->pixels, afft_size, clip);
   } else {
   #endif
     t_print("WDSP:TX SetAnalyzer id=%d buffer_size=%d overlap=%d pixels=%d\n", 
@@ -1905,7 +1916,7 @@ void tx_set_analyzer(const TRANSMITTER *tx) {
               window_type,           // 5 = Kaiser
               kaiser_pi,             // PiAlpha parameter for Kaiser window
               overlap,               // overlap samples
-              clip,                  // clip bins from each side
+              clip,                  // clip bins from each side - ADDED for SOAPY
               fscLin,                // bins to clip from low end
               fscHin,                // bins to clip from high end
               tx->pixels,            // number of pixel values to return
