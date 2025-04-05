@@ -1542,9 +1542,12 @@ void radio_start_radio() {
       soapy_protocol_create_transmitter(transmitter);
       soapy_protocol_set_tx_antenna(transmitter, dac[0].antenna);
       //soapy_protocol_set_tx_gain(transmitter, transmitter->drive);
-      soapy_protocol_set_tx_gain(transmitter, 0);
+      t_print("Setting TX to +34dB before calibration");
+      soapy_protocol_set_tx_gain(transmitter, 30);
       soapy_protocol_set_tx_frequency(transmitter);
       soapy_protocol_start_transmitter(transmitter);
+      t_print("Setting TX to 0dB to avoid LO leak");
+      soapy_protocol_set_tx_gain(transmitter, 0);
     }
 
     soapy_protocol_set_rx_antenna(rx, adc[0].antenna);
@@ -1559,6 +1562,7 @@ void radio_start_radio() {
     soapy_protocol_start_receiver(rx);
     //t_print("radio: set rf_gain=%f\n",rx->rf_gain);
     soapy_protocol_set_gain(rx);
+
   }
 
 #endif
