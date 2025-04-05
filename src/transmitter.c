@@ -1865,33 +1865,55 @@ void tx_set_analyzer(const TRANSMITTER *tx) {
   const double span_max_freq = 0.0;
   const int clip = 0;
   const int window_type = 5;
-  const int afft_size = 16384;
-  const int pixels = tx->pixels;
-  int overlap;
-  int max_w = afft_size + (int) min(keep_time * (double) tx->iq_output_rate,
-                                    keep_time * (double) afft_size * (double) tx->fps);
-  overlap = (int)max(0.0, ceil(afft_size - (double)tx->iq_output_rate / (double)tx->fps));
-  t_print("WDSP:TX SetAnalyzer id=%d buffer_size=%d overlap=%d pixels=%d\n", tx->id, tx->output_samples, overlap,
-          tx->pixels);
+  
+  // Default parameters (used for all protocols except SOAPY)
+  int afft_size = 16384;
+  int overlap = (int)max(0.0, ceil(afft_size - (double)tx->iq_output_rate / (double)tx->fps));
+  int max_w = afft_size + (int)min(keep_time * (double)tx->iq_output_rate, 
+                                   keep_time * (double)afft_size * (double)tx->fps);
+  
+  // Override parameters for SOAPY SDR
+  #ifdef SOAPYSDR
+  t_print("Setting SOAPY TX Analyzer");
+  if (protocol == SOAPYSDR_PROTOCOL) {
+    // Use much larger FFT size for SOAPY's higher bandwidth
+    afft_size = 65536;  // 4x larger than default
+    
+    // Use higher percentage overlap for SOAPY
+    overlap = (int)(0.75 * afft_size);
+    
+    // Larger window for SOAPY's higher sample rate
+    max_w = afft_size * 2;
+    
+    t_print("WDSP:TX SetAnalyzer for SOAPY id=%d buffer_size=%d overlap=%d pixels=%d afft_size=%d\n", 
+            tx->id, tx->output_samples, overlap, tx->pixels, afft_size);
+  } else {
+  #endif
+    t_print("WDSP:TX SetAnalyzer id=%d buffer_size=%d overlap=%d pixels=%d\n", 
+            tx->id, tx->output_samples, overlap, tx->pixels);
+  #ifdef SOAPYSDR
+  }
+  #endif
+  
   SetAnalyzer(tx->id,                // id of the TXA channel
               n_pixout,              // 1 = "use same data for scope and waterfall"
               spur_elimination_ffts, // 1 = "no spur elimination"
               data_type,             // 1 = complex input data (I & Q)
-              flp,                   // vector with one elt for each LO frequency, 1 if high-side LO, 0 otherwise
-              afft_size,             // size of the fft, i.e., number of input samples
-              tx->output_samples,    // number of samples transferred for each OpenBuffer()/CloseBuffer()
-              window_type,           // 4 = Hamming
+              flp,                   // vector with one elt for each LO frequency
+              afft_size,             // size of the fft
+              tx->output_samples,    // samples per buffer
+              window_type,           // 5 = Kaiser
               kaiser_pi,             // PiAlpha parameter for Kaiser window
-              overlap,               // number of samples each fft (other than the first) is to re-use from the previous
-              clip,                  // number of fft output bins to be clipped from EACH side of each sub-span
-              fscLin,                // number of bins to clip from low end of entire span
-              fscHin,                // number of bins to clip from high end of entire span
-              pixels,                // number of pixel values to return.  may be either <= or > number of bins
-              stitches,              // number of sub-spans to concatenate to form a complete span
-              calibration_data_set,  // identifier of which set of calibration data to use
-              span_min_freq,         // frequency at first pixel value8192
-              span_max_freq,         // frequency at last pixel value
-              max_w                  // max samples to hold in input ring buffers
+              overlap,               // overlap samples
+              clip,                  // clip bins from each side
+              fscLin,                // bins to clip from low end
+              fscHin,                // bins to clip from high end
+              tx->pixels,            // number of pixel values to return
+              stitches,              // number of sub-spans
+              calibration_data_set,  // calibration data set ID
+              span_min_freq,         // frequency at first pixel
+              span_max_freq,         // frequency at last pixel
+              max_w                  // max samples in ring buffers
              );
 }
 

@@ -477,12 +477,24 @@ void soapy_protocol_stop() {
 
 void soapy_protocol_set_rx_frequency(RECEIVER *rx, int v) {
   if (soapy_device != NULL) {
+
+    SoapySDRKwargs args = {}; // This zero-initializes the structure
+    
+    // Initialize the structure
+    args.size = 0;
+    args.keys = NULL;
+    args.vals = NULL;
+
+    // Add the -1 MHz offset (in Hz) //1MHz is enough for 700kS/s max we use
+    SoapySDRKwargs_set(&args, "OFFSET", "-1e6");  // or "-1000000"
+
     double f = (double)(vfo[v].frequency - vfo[v].lo);
-    int rc = SoapySDRDevice_setFrequency(soapy_device, SOAPY_SDR_RX, rx->adc, f, NULL);
+    int rc = SoapySDRDevice_setFrequency(soapy_device, SOAPY_SDR_RX, rx->adc, f, &args);
 
     if (rc != 0) {
       t_print("soapy_protocol: SoapySDRDevice_setFrequency(RX) failed: %s\n", SoapySDR_errToStr(rc));
     }
+    //SoapySDRKwargs_clear(&args);
   }
 }
 
@@ -503,7 +515,7 @@ void soapy_protocol_set_tx_frequency(TRANSMITTER *tx) {
       f += (double)(vfo[v].xit);
     }
 
-    //t_print("soapy_protocol_set_tx_frequency: %f\n",f);
+    t_print("soapy_protocol_set_tx_frequency: %f\n",f);
     int rc = SoapySDRDevice_setFrequency(soapy_device, SOAPY_SDR_TX, tx->dac, f, NULL);
 
     if (rc != 0) {
