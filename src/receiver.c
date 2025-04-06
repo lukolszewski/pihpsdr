@@ -1053,6 +1053,7 @@ void rx_vfo_changed(RECEIVER *rx) {
   // Called when the VFO controlling rx has changed,
   // e.g. after a "swap VFO" action
   //
+  t_print("Call to vfo_changed!");
   rx_frequency_changed(rx);
   rx_mode_changed(rx);
 }

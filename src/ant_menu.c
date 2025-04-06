@@ -81,7 +81,7 @@ static void adc0_antenna_cb(GtkComboBox *widget, gpointer data) {
   schedule_high_priority();
 
   if (device == SOAPYSDR_USB_DEVICE) {
-    soapy_protocol_set_rx_antenna(receiver[0], adc[0].antenna);
+    soapy_protocol_set_rx_antenna(active_receiver, adc[0].antenna);
   }
 }
 
@@ -90,7 +90,7 @@ static void dac0_antenna_cb(GtkComboBox *widget, gpointer data) {
   mydac->antenna = gtk_combo_box_get_active(widget);
   schedule_high_priority();
 
-  if (device == SOAPYSDR_USB_DEVICE && can_transmit) {
+  if (device == SOAPYSDR_USB_DEVICE && can_transmit && radio_is_transmitting()) {
     soapy_protocol_set_tx_antenna(transmitter, mydac->antenna);
   }
 }

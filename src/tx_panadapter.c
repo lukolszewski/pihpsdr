@@ -106,7 +106,12 @@ void tx_panadapter_update(TRANSMITTER *tx) {
     int txmode = vfo_get_tx_mode();
     double filter_left, filter_right;
     float *samples = tx->pixel_samples;
+    // For sample data - based on the original ratio but with display ratio adjustment
     double hz_per_pixel = (double)tx->iq_output_rate / (double)tx->pixels;
+
+    // For frequency markers - based on the total bandwidth divided by screen width
+    long long half = tx->dialog ? 3000LL : 12000LL;
+    double freq_hz_per_pixel = (double)(2 * half) / (double)mywidth;
     cairo_t *cr;
     cr = cairo_create (tx->panadapter_surface);
     cairo_set_source_rgba(cr, COLOUR_PAN_BACKGND);
@@ -116,8 +121,8 @@ void tx_panadapter_update(TRANSMITTER *tx) {
 
     if (txmode != modeCWU && txmode != modeCWL) {
       cairo_set_source_rgba(cr, COLOUR_PAN_FILTER);
-      filter_left = (double)mywidth / 2.0 + ((double)tx->filter_low / hz_per_pixel);
-      filter_right = (double)mywidth / 2.0 + ((double)tx->filter_high / hz_per_pixel);
+      filter_left = (double)mywidth / 2.0 + ((double)tx->filter_low / freq_hz_per_pixel);
+      filter_right = (double)mywidth / 2.0 + ((double)tx->filter_high / freq_hz_per_pixel);
       cairo_rectangle(cr, filter_left, 0.0, filter_right - filter_left, (double)myheight);
       cairo_fill(cr);
     }
@@ -154,7 +159,7 @@ void tx_panadapter_update(TRANSMITTER *tx) {
     }
 
     // plot frequency markers
-    long long half = tx->dialog ? 3000LL : 12000LL; //(long long)(tx->output_rate/2);
+    //long long half = tx->dialog ? 3000LL : 12000LL; //(long long)(tx->output_rate/2);
     long long frequency;
 
     if (vfo[txvfo].ctun) {
@@ -182,7 +187,7 @@ void tx_panadapter_update(TRANSMITTER *tx) {
       f = ((min_display / divisor) * divisor) + divisor;
 
       while (f < max_display) {
-        double x = (double)(f - min_display) / hz_per_pixel;
+        double x = (double)(f - min_display) / freq_hz_per_pixel;
 
         //
         // Skip vertical line if it is in the filter area, since
@@ -232,14 +237,16 @@ void tx_panadapter_update(TRANSMITTER *tx) {
       cairo_set_line_width(cr, PAN_LINE_EXTRA);
 
       if ((min_display < band->frequencyMin) && (max_display > band->frequencyMin)) {
-        int i = (band->frequencyMin - min_display) / (long long)hz_per_pixel;
+        //int i = (band->frequencyMin - min_display) / (long long)hz_per_pixel;
+        int i = (band->frequencyMin - min_display) / (long long)freq_hz_per_pixel;
         cairo_move_to(cr, (double)i, 0.0);
         cairo_line_to(cr, (double)i, (double)myheight);
         cairo_stroke(cr);
       }
 
       if ((min_display < band->frequencyMax) && (max_display > band->frequencyMax)) {
-        int i = (band->frequencyMax - min_display) / (long long)hz_per_pixel;
+        //int i = (band->frequencyMax - min_display) / (long long)hz_per_pixel;
+        int i = (band->frequencyMax - min_display) / (long long)freq_hz_per_pixel;
         cairo_move_to(cr, (double)i, 0.0);
         cairo_line_to(cr, (double)i, (double)myheight);
         cairo_stroke(cr);
@@ -253,11 +260,22 @@ void tx_panadapter_update(TRANSMITTER *tx) {
     cairo_move_to(cr, vfofreq, 0.0);
     cairo_line_to(cr, vfofreq, (double)myheight);
     cairo_stroke(cr);
-    // signal
+
     double s1;
-    int offset = (tx->pixels / 2) - (mywidth / 2);
+    int offset = ((tx->pixels / tx->display_ratio) / 2) - (mywidth / 2); // Adjust offset for display_ratio
     samples[offset] = -200.0;
     samples[offset + mywidth - 1] = -200.0;
+
+    // Before drawing loop
+    //for (int i = 0; i < mywidth; i += 64) {
+    //  fprintf(stderr, "Sample at offset+%d (%d): %f\n", i, offset+i, samples[offset+i]);
+   // }
+   int max_valid_width = MIN(mywidth, (int)(tx->pixels / tx->display_ratio));
+  if (mywidth > max_valid_width) {
+    // Optionally warn about display width exceeding valid data
+    g_print("Warning: Display width %d exceeds available data %d\n", mywidth, max_valid_width);
+  }
+
     s1 = (double)samples[offset];
     s1 = floor((tx->panadapter_high - s1)
                * (double) myheight

@@ -36,6 +36,7 @@ typedef struct _transmitter {
   int dsp_size;
   int fft_size;
   int pixels;
+  int display_ratio;
   int samples;
   int output_samples;
   int ratio;

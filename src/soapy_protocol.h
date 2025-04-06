@@ -39,6 +39,12 @@ double get_lo_frequency(double freq_hz);
 void soapy_protocol_create_receiver(RECEIVER *rx);
 void soapy_protocol_start_receiver(RECEIVER *rx);
 
+void soapy_protocol_create_receivers(RECEIVER *rx[]);
+void soapy_protocol_start_receivers(RECEIVER *rx[]);
+
+void soapy_protocol_create_duplicate_receivers(RECEIVER *rx[]);
+void soapy_protocol_start_duplicate_receivers(RECEIVER *rx[]);
+
 void soapy_protocol_init(gboolean hf);
 void soapy_protocol_stop(void);
 void soapy_protocol_stop_receiver(const RECEIVER *rx);

@@ -1372,7 +1372,7 @@ void radio_start_radio() {
   //
   if (device == SOAPYSDR_USB_DEVICE) {
     iqswap = 1;
-    receivers = 1;
+    receivers = 2;
     filter_board = NO_FILTER_BOARD;
   }
 
@@ -1419,6 +1419,11 @@ void radio_start_radio() {
       adc[0].min_gain = radio->info.soapy.rx_range[0].minimum;
       adc[0].max_gain = radio->info.soapy.rx_range[0].maximum;;
       adc[0].gain = adc[0].min_gain;
+      if(strcmp(radio->name, "lime") == 0) {
+        adc[1].min_gain = radio->info.soapy.rx_range[0].minimum; // They both have the same min/max
+        adc[1].max_gain = radio->info.soapy.rx_range[0].maximum;
+        adc[1].gain = adc[1].min_gain;
+      }
     }
   }
 
@@ -1447,7 +1452,7 @@ void radio_start_radio() {
 #ifdef SOAPYSDR
 
   if (device == SOAPYSDR_USB_DEVICE) {
-    if (radio->info.soapy.rx_gains > 0) {
+    if (radio->info.soapy.rx_gains > 0 && strcmp(radio->name, "lime") != 0) {
       adc[1].min_gain = radio->info.soapy.rx_range[0].minimum;
       adc[1].max_gain = radio->info.soapy.rx_range[0].maximum;;
       adc[1].gain = adc[1].min_gain;
@@ -1480,21 +1485,22 @@ void radio_start_radio() {
   display_sliders = 1;
   display_toolbar = 1;
 #endif
-  t_print("%s: setup RECEIVERS protocol=%d\n", __FUNCTION__, protocol);
+  t_print("%s: setup RECEIVERS protocol=%d\n, radio type: %s\n", __FUNCTION__, protocol,radio->name);
 
   switch (protocol) {
   case SOAPYSDR_PROTOCOL:
     t_print("%s: setup RECEIVERS SOAPYSDR\n", __FUNCTION__);
-    RECEIVERS = 1;
-    PS_TX_FEEDBACK = 1;
-    PS_RX_FEEDBACK = 2;
-    break;
-
-  default:
-    t_print("%s: setup RECEIVERS default\n", __FUNCTION__);
-    RECEIVERS = 2;
-    PS_TX_FEEDBACK = (RECEIVERS);
-    PS_RX_FEEDBACK = (RECEIVERS + 1);
+    if(strcmp(radio->name, "lime") == 0) {
+      t_print("Aplying LimeSDR settings.");
+      RECEIVERS = 2;
+      PS_TX_FEEDBACK = (RECEIVERS);
+      PS_RX_FEEDBACK = (RECEIVERS + 1);
+    } else {
+      t_print("Generic SoapySDR settings.");
+      RECEIVERS = 1;
+      PS_TX_FEEDBACK = 1;
+      PS_RX_FEEDBACK = 2;
+    }
     break;
   }
 
@@ -1503,6 +1509,7 @@ void radio_start_radio() {
   radio_change_region(region);
   radio_create_visual();
   radio_reconfigure_screen();
+  t_print("After screen reconfigure.");
 
 #ifdef TCI
   if (tci_enable) {
@@ -1535,8 +1542,8 @@ void radio_start_radio() {
 #ifdef SOAPYSDR
 
   if (protocol == SOAPYSDR_PROTOCOL) {
-    RECEIVER *rx = receiver[0];
-    soapy_protocol_create_receiver(rx);
+   //RECEIVER *rx = receiver[0];
+   // soapy_protocol_create_receiver(rx);
 
     if (can_transmit) {
       soapy_protocol_create_transmitter(transmitter);
@@ -1550,19 +1557,35 @@ void radio_start_radio() {
       soapy_protocol_set_tx_gain(transmitter, 0);
     }
 
-    soapy_protocol_set_rx_antenna(rx, adc[0].antenna);
-    soapy_protocol_set_rx_frequency(rx, VFO_A);
-    soapy_protocol_set_automatic_gain(rx, adc[0].agc);
-    if (!adc[0].agc) { soapy_protocol_set_gain(rx); }
+    for (int i = 0; i < RECEIVERS; i++) {
+        RECEIVER *rx = receiver[i];
 
-    if (vfo[0].ctun) {
-      rx_set_frequency(rx, vfo[0].ctun_frequency);
+        
+        soapy_protocol_set_automatic_gain(rx, adc[i].agc);
+        soapy_protocol_set_rx_antenna(rx, adc[i].antenna);
+        //if (!adc[i].agc) { soapy_protocol_set_gain(rx); }
+        //soapy_protocol_set_rx_frequency(rx, i == 0 ? VFO_A : VFO_B);
+        soapy_protocol_set_rx_frequency(rx, VFO_A);
+        if (vfo[i].ctun) {
+          rx_set_frequency(rx, vfo[i].ctun_frequency);
+        }
+        //t_print("radio: set rf_gain=%f\n",rx->rf_gain);
+        soapy_protocol_set_gain(rx); 
     }
 
-    soapy_protocol_start_receiver(rx);
-    //t_print("radio: set rf_gain=%f\n",rx->rf_gain);
-    soapy_protocol_set_gain(rx);
-
+    if(RECEIVERS == 1) {
+      //soapy_protocol_set_automatic_gain(receiver[0], adc[0].agc);
+      //soapy_protocol_set_rx_antenna(receiver[0], adc[0].antenna);
+      soapy_protocol_create_receiver(receiver[0]);
+      soapy_protocol_start_receiver(receiver[0]);
+      //soapy_protocol_set_gain(receiver[0]); 
+    } else {
+      //soapy_protocol_create_receivers(receiver);
+      //soapy_protocol_start_receivers(receiver);
+      soapy_protocol_create_receivers(receiver);
+      soapy_protocol_start_receivers(receiver);
+      
+    }
   }
 
 #endif
@@ -2297,7 +2320,7 @@ void radio_set_drive(double value) {
 #ifdef SOAPYSDR
 
   case SOAPYSDR_PROTOCOL:
-  if(mox) {
+  if(radio_is_transmitting()) {
     soapy_protocol_set_tx_gain(transmitter, transmitter->drive);
   }
     break;

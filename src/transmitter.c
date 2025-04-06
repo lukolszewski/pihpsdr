@@ -294,7 +294,11 @@ void tx_reconfigure(TRANSMITTER *tx, int width, int height) {
     // The value of tx->pixels corresponds to the *full* TX spectrum in the
     // target resolution.
     //
-    tx->pixels = display_width * tx->ratio * 2;
+    //tx->pixels = display_width * tx->ratio * 2;
+    tx->display_ratio = (display_width * tx->ratio * 2 > 16384) ? 1.0 : 2.0; //it breaks above this limit
+    tx->pixels = display_width * tx->ratio * tx->display_ratio;
+    tx->pixels = (tx->pixels > 16384) ? 16384 : tx->pixels;
+
     g_free(tx->pixel_samples);
     tx->pixel_samples = g_new(float, tx->pixels);
     tx_set_analyzer(tx);
@@ -880,7 +884,10 @@ TRANSMITTER *tx_create_transmitter(int id, int width, int height) {
   }
 
   tx->output_samples = tx->buffer_size * tx->ratio;
-  tx->pixels = display_width * tx->ratio * 2;
+  //tx->pixels = display_width * tx->ratio * 2;
+  tx->display_ratio = (display_width * tx->ratio * 2 > 16384) ? 1.0 : 2.0; //it breaks above this limit
+  tx->pixels = display_width * tx->ratio * tx->display_ratio;
+  tx->pixels = (tx->pixels > 16384) ? 16384 : tx->pixels;
   tx->width = width;
   tx->height = height;
   tx->display_panadapter = 1;
@@ -1869,6 +1876,12 @@ void tx_set_analyzer(const TRANSMITTER *tx) {
   int overlap;
   int max_w;
   int clip = 0;
+
+  //#ifdef SOAPYSDR
+  //if (protocol == SOAPYSDR_PROTOCOL && strcmp(radio->name, "lime") == 0) {
+  //  int afft_size = 65536;
+ // }
+ // #endif
   
   // Calculate base overlap for standard protocols
   overlap = (int)max(0.0, ceil(afft_size - (double)tx->iq_output_rate / (double)tx->fps));
@@ -1938,6 +1951,7 @@ void tx_off(const TRANSMITTER *tx) {
 
 #ifdef SOAPYSDR
   soapy_protocol_set_tx_gain(transmitter, 0);
+  soapy_protocol_set_tx_antenna(transmitter, 0);
 
   const char *bank = "MAIN";
   t_print("Transmitter:Setting GPIO to 0");
@@ -1976,6 +1990,7 @@ for (int i = 0; i < RECEIVERS; i++) {
   SoapySDRDevice_writeGPIODir(sdr,bank,0xFF);
   SoapySDRDevice_writeGPIO(sdr,bank, 0x01);
   usleep(30000);
+  soapy_protocol_set_tx_antenna(transmitter, dac[0].antenna);
   soapy_protocol_set_tx_gain(transmitter, transmitter->drive);
 #endif
 
