@@ -1545,18 +1545,6 @@ void radio_start_radio() {
    //RECEIVER *rx = receiver[0];
    // soapy_protocol_create_receiver(rx);
 
-    if (can_transmit) {
-      soapy_protocol_create_transmitter(transmitter);
-      soapy_protocol_set_tx_antenna(transmitter, dac[0].antenna);
-      //soapy_protocol_set_tx_gain(transmitter, transmitter->drive);
-      t_print("Setting TX to +34dB before calibration");
-      soapy_protocol_set_tx_gain(transmitter, 30);
-      soapy_protocol_set_tx_frequency(transmitter);
-      soapy_protocol_start_transmitter(transmitter);
-      t_print("Setting TX to 0dB to avoid LO leak");
-      soapy_protocol_set_tx_gain(transmitter, 0);
-    }
-
     for (int i = 0; i < RECEIVERS; i++) {
         RECEIVER *rx = receiver[i];
 
@@ -1586,6 +1574,19 @@ void radio_start_radio() {
       soapy_protocol_start_receivers(receiver);
       
     }
+
+    if (can_transmit) {
+      soapy_protocol_create_transmitter(transmitter);
+      soapy_protocol_set_tx_antenna(transmitter, dac[0].antenna);
+      //soapy_protocol_set_tx_gain(transmitter, transmitter->drive);
+      t_print("Setting TX to +34dB before calibration");
+      soapy_protocol_set_tx_gain(transmitter, 30);
+      soapy_protocol_set_tx_frequency(transmitter);
+      soapy_protocol_start_transmitter(transmitter);
+      t_print("Setting TX to 0dB to avoid LO leak");
+      soapy_protocol_set_tx_gain(transmitter, 0);
+    }
+
   }
 
 #endif
