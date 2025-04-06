@@ -50,7 +50,7 @@ static SoapySDRStream *tx_stream;
 static SoapySDRDevice *soapy_device;
 static int max_samples;
 
-static double bandwidth = 2000000.0;
+static double bandwidth = 12000000.0;
 
 static GThread *receive_thread_id = NULL;
 static gpointer receive_thread(gpointer data);
@@ -60,6 +60,8 @@ static gboolean running;
 static int mic_samples = 0;
 static int mic_sample_divisor = 1;
 
+double lo_frequency = 100e6;
+
 static int max_tx_samples;
 static float *output_buffer;
 static int output_buffer_index;
@@ -67,6 +69,26 @@ static int output_buffer_index;
 // cppcheck-suppress unusedFunction
 SoapySDRDevice *get_soapy_device() {
   return soapy_device;
+}
+
+Band bands[] = {
+    //{430e6, 440e6, 4.282000e+08},     // 70cm
+    {430e6, 440e6, 435e6},     // 70cm
+    {144e6, 148e6, 142e6},     // 2m
+    {1240e6, 1300e6, 1238e6},  // 23cm
+    {2300e6, 2450e6, 2298e6}   // 13cm
+};
+
+double get_lo_frequency(double freq_hz) {
+    int num_bands = sizeof(bands) / sizeof(bands[0]);
+    for (int i = 0; i < num_bands; i++) {
+        if (freq_hz >= bands[i].lower_bound && freq_hz <= bands[i].upper_bound) {
+            t_print("Get LO called returning %e",bands[i].lo_frequency);
+            return bands[i].lo_frequency;
+        }
+    }
+    t_print("Get LO called returning default %e, received %e",freq_hz - 2e6,freq_hz);
+    return freq_hz - 2e6;  // default: 2 MHz lower
 }
 
 void soapy_protocol_set_mic_sample_rate(int rate) {
@@ -146,6 +168,13 @@ void soapy_protocol_create_receiver(RECEIVER *rx) {
 
   t_print("%s: setting samplerate=%f device=%p adc=%d mic_sample_divisor=%d\n", __FUNCTION__, (double)radio_sample_rate,
           soapy_device, rx->adc, mic_sample_divisor);
+
+  t_print("Writing RX oversampling setting");
+  rc = SoapySDRDevice_writeSetting(soapy_device, "OVERSAMPLING", "32");
+  if (rc != 0) {
+    t_print("%s: SoapySDRDevice setting oversampling failed: %s\n", __FUNCTION__,
+            SoapySDR_errToStr(rc));
+  }
   rc = SoapySDRDevice_setSampleRate(soapy_device, SOAPY_SDR_RX, rx->adc, (double)radio_sample_rate);
 
   if (rc != 0) {
@@ -218,6 +247,21 @@ void soapy_protocol_start_receiver(RECEIVER *rx) {
 
 void soapy_protocol_create_transmitter(TRANSMITTER *tx) {
   int rc;
+
+  t_print("%s: device=%p adc=%d setting bandwidth=%f\n", __FUNCTION__, soapy_device, tx->dac, bandwidth);
+  rc = SoapySDRDevice_setBandwidth(soapy_device, SOAPY_SDR_TX, tx->dac, bandwidth);
+
+  if (rc != 0) {
+    t_print("%s: SoapySDRDevice_setBandwidth(%f) failed: %s\n", __FUNCTION__, (double)bandwidth, SoapySDR_errToStr(rc));
+  }
+
+  t_print("Writing TX oversampling setting");
+  rc = SoapySDRDevice_writeSetting(soapy_device, "OVERSAMPLING", "32");
+  if (rc != 0) {
+    t_print("%s: SoapySDRDevice setting oversampling failed: %s\n", __FUNCTION__,
+            SoapySDR_errToStr(rc)); 
+  }
+
   t_print("%s: setting samplerate=%f\n", __FUNCTION__, (double)tx->iq_output_rate);
   rc = SoapySDRDevice_setSampleRate(soapy_device, SOAPY_SDR_TX, tx->dac, (double)tx->iq_output_rate);
 
@@ -319,6 +363,13 @@ void soapy_protocol_init(gboolean hf) {
     t_print("%s: SoapySDRDevice_make failed: %s\n", __FUNCTION__, SoapySDRDevice_lastError());
     g_idle_add(fatal_error, "Soapy Make Device Failed");
   }
+
+ // t_print("Writing initialoversampling setting");
+ // int rc = SoapySDRDevice_writeSetting(soapy_device, "OVERSAMPLING", "16");
+ // if (rc != 0) {
+ //   t_print("%s: SoapySDRDevice setting oversampling failed: %s\n", __FUNCTION__,
+ //           SoapySDR_errToStr(rc));
+ // }
 
   SoapySDRKwargs_clear(&args);
   t_print("%s: soapy_device=%p\n", __FUNCTION__, soapy_device);
@@ -475,8 +526,34 @@ void soapy_protocol_stop() {
   running = FALSE;
 }
 
+void printFrequencyComponents(const SoapySDRDevice *device, int direction, size_t channel)
+{
+    size_t numComponents = 0;
+    char **components = SoapySDRDevice_listFrequencies(device, direction, channel, &numComponents);
+
+    for (size_t i = 0; i < numComponents; i++)
+    {
+        const char *name = components[i];
+        double freq = SoapySDRDevice_getFrequencyComponent(device, direction, channel, name);
+        t_print("component %s: %e\n", name, (double)freq);
+
+        size_t numRanges = 0;
+        SoapySDRRange *ranges = SoapySDRDevice_getFrequencyRangeComponent(device, direction, channel, name, &numRanges);
+        for (size_t j = 0; j < numRanges; j++)
+        {
+            t_print("  range %zu: %e Hz to %e Hz\n", j, (double)ranges[j].minimum, (double)ranges[j].maximum);
+        }
+    }
+
+    // Free components and ranges if required by SoapySDR implementation
+}
+
 void soapy_protocol_set_rx_frequency(RECEIVER *rx, int v) {
   if (soapy_device != NULL) {
+
+    double f = (double)(vfo[v].frequency - vfo[v].lo);
+
+    double new_lo_freq = get_lo_frequency(f);
 
     SoapySDRKwargs args = {}; // This zero-initializes the structure
     
@@ -485,16 +562,24 @@ void soapy_protocol_set_rx_frequency(RECEIVER *rx, int v) {
     args.keys = NULL;
     args.vals = NULL;
 
-    // Add the -1 MHz offset (in Hz) //1MHz is enough for 700kS/s max we use
-    SoapySDRKwargs_set(&args, "OFFSET", "-1e6");  // or "-1000000"
+    double offset = f - new_lo_freq;
+    t_print("Setting rx freq to %e, with offsett %e",new_lo_freq,offset);
 
-    double f = (double)(vfo[v].frequency - vfo[v].lo);
-    int rc = SoapySDRDevice_setFrequency(soapy_device, SOAPY_SDR_RX, rx->adc, f, &args);
-
+    if(lo_frequency != new_lo_freq) {
+      t_print("Setting LO to %e freq first",new_lo_freq);
+      int rc = SoapySDRDevice_setFrequencyComponent(soapy_device, SOAPY_SDR_RX, rx->adc, "RF", new_lo_freq, NULL);
+      if (rc != 0) {
+        t_print("soapy_protocol: SoapySDRDevice_setFrequency(RX) failed: %s\n", SoapySDR_errToStr(rc));
+      }
+      lo_frequency = new_lo_freq;
+    }
+    
+    int rc = SoapySDRDevice_setFrequencyComponent(soapy_device, SOAPY_SDR_RX, rx->adc, "BB", offset, NULL);
     if (rc != 0) {
       t_print("soapy_protocol: SoapySDRDevice_setFrequency(RX) failed: %s\n", SoapySDR_errToStr(rc));
     }
-    //SoapySDRKwargs_clear(&args);
+    printFrequencyComponents(soapy_device, SOAPY_SDR_RX, rx->adc);
+    SoapySDRKwargs_clear(&args);
   }
 }
 
@@ -514,13 +599,33 @@ void soapy_protocol_set_tx_frequency(TRANSMITTER *tx) {
     if (vfo[v].xit_enabled) {
       f += (double)(vfo[v].xit);
     }
+    double new_lo_freq = get_lo_frequency(f);
 
-    t_print("soapy_protocol_set_tx_frequency: %f\n",f);
-    int rc = SoapySDRDevice_setFrequency(soapy_device, SOAPY_SDR_TX, tx->dac, f, NULL);
+    SoapySDRKwargs args = {}; // This zero-initializes the structure
+    
+    // Initialize the structure
+    args.size = 0;
+    args.keys = NULL;
+    args.vals = NULL;
 
+    double offset = f - new_lo_freq;
+    t_print("Setting tx freq to %e, with offsett %e",new_lo_freq,offset);
+
+    if(lo_frequency != new_lo_freq) {
+      t_print("Setting LO to %e freq first",new_lo_freq);
+      int rc = SoapySDRDevice_setFrequencyComponent(soapy_device, SOAPY_SDR_TX, tx->dac, "RF", new_lo_freq, NULL);
+      if (rc != 0) {
+        t_print("soapy_protocol: SoapySDRDevice_setFrequency(RX) failed: %s\n", SoapySDR_errToStr(rc));
+      }
+      lo_frequency = new_lo_freq;
+    }
+    
+    int rc = SoapySDRDevice_setFrequencyComponent(soapy_device, SOAPY_SDR_TX, tx->dac, "BB", offset, NULL);
     if (rc != 0) {
       t_print("soapy_protocol: SoapySDRDevice_setFrequency(TX) failed: %s\n", SoapySDR_errToStr(rc));
     }
+    printFrequencyComponents(soapy_device, SOAPY_SDR_TX, tx->dac);
+    SoapySDRKwargs_clear(&args);
   }
 }
 

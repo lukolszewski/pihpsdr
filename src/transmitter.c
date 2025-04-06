@@ -1875,7 +1875,7 @@ void tx_set_analyzer(const TRANSMITTER *tx) {
   max_w = afft_size + (int)min(0.1 * (double)tx->iq_output_rate, 0.1 * (double)afft_size * (double)tx->fps);
   
   // Override parameters for SOAPY SDR
-  #ifdef SOAPYSDR
+ /* #ifdef SOAPYSDR
   if (protocol == SOAPYSDR_PROTOCOL) {
     // Calculate how many new samples we get between frames
     int samples_per_frame = tx->iq_output_rate / tx->fps;
@@ -1899,12 +1899,12 @@ void tx_set_analyzer(const TRANSMITTER *tx) {
     t_print("WDSP:TX SetAnalyzer for SOAPY id=%d buffer_size=%d samples_per_frame=%d overlap=%d pixels=%d afft_size=%d clip=%d\n", 
             tx->id, tx->output_samples, samples_per_frame, overlap, tx->pixels, afft_size, clip);
   } else {
-  #endif
+  #endif */
     t_print("WDSP:TX SetAnalyzer id=%d buffer_size=%d overlap=%d pixels=%d\n", 
             tx->id, tx->output_samples, overlap, tx->pixels);
-  #ifdef SOAPYSDR
+/*  #ifdef SOAPYSDR
   }
-  #endif
+  #endif */
   
   SetAnalyzer(tx->id,                // id of the TXA channel
               n_pixout,              // 1 = "use same data for scope and waterfall"

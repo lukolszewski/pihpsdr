@@ -22,7 +22,19 @@
 #include "receiver.h"
 #include "transmitter.h"
 
+extern double lo_frequency;
+
 SoapySDRDevice *get_soapy_device(void);
+
+typedef struct {
+    double lower_bound;   // in Hz
+    double upper_bound;   // in Hz
+    double lo_frequency;  // in Hz
+} Band;
+
+extern Band bands[];
+
+double get_lo_frequency(double freq_hz);
 
 void soapy_protocol_create_receiver(RECEIVER *rx);
 void soapy_protocol_start_receiver(RECEIVER *rx);

@@ -116,6 +116,7 @@ static void get_info(char *driver) {
   }
 
   int sample_rate = 768000;
+  //int sample_rate = 1000000;
   SoapySDRRange *rx_rates = SoapySDRDevice_getSampleRateRange(sdr, SOAPY_SDR_RX, 0, &rx_rates_length);
 
   for (size_t i = 0; i < rx_rates_length; i++) {

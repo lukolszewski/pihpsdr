@@ -1067,7 +1067,7 @@ void vfo_id_step(int id, int steps) {
     }
 
     rx_frequency_changed(receiver[id]);
-    tx_frequency_changed(transmitter);
+    //tx_frequency_changed(transmitter);
     g_idle_add(ext_vfo_update, NULL);
   }
 }
