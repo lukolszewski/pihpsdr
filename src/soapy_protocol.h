@@ -32,7 +32,7 @@ typedef struct {
     double lo_frequency;  // in Hz
 } Band;
 
-extern Band bands[];
+extern Band rx_bands[];
 
 double get_lo_frequency(double freq_hz);
 
