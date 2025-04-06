@@ -936,7 +936,7 @@ void soapy_protocol_set_rx_frequency(RECEIVER *rx, int v) {
     args.vals = NULL;
 
     double offset = f - new_lo_freq;
-    t_print("Setting tx freq  %e with lo %e, and offsett %e",f,new_lo_freq,offset);
+    t_print("Setting rx no %d, freq  %e with lo %e, and offsett %e",rx->adc,f,new_lo_freq,offset);
 
 
     double current_lo_freq = SoapySDRDevice_getFrequencyComponent(soapy_device, SOAPY_SDR_RX, rx->adc, "RF");
@@ -947,6 +947,8 @@ void soapy_protocol_set_rx_frequency(RECEIVER *rx, int v) {
         t_print("soapy_protocol: SoapySDRDevice_setFrequency(RX) failed: %s\n", SoapySDR_errToStr(rc));
       }
       lo_frequency = new_lo_freq;
+    }else{
+      t_print("No need to set LO, already where it needs to be.");
     }
     
     int rc = SoapySDRDevice_setFrequencyComponent(soapy_device, SOAPY_SDR_RX, rx->adc, "BB", offset, NULL);
@@ -984,7 +986,7 @@ void soapy_protocol_set_tx_frequency(TRANSMITTER *tx) {
     args.vals = NULL;
 
     double offset = f - new_lo_freq;
-    t_print("Setting tx freq  %e with lo %e, and offsett %e",f,new_lo_freq,offset);
+    t_print("Setting tx id %d,to freq  %e with lo %e, and offsett %e",tx->dac,f,new_lo_freq,offset);
 
     double current_lo_freq = SoapySDRDevice_getFrequencyComponent(soapy_device, SOAPY_SDR_TX, tx->dac, "RF");
     if (current_lo_freq != new_lo_freq) {
@@ -994,6 +996,8 @@ void soapy_protocol_set_tx_frequency(TRANSMITTER *tx) {
         t_print("soapy_protocol: SoapySDRDevice_setFrequency(RX) failed: %s\n", SoapySDR_errToStr(rc));
       }
       lo_frequency = new_lo_freq;
+    }else{
+      t_print("No need to set LO, already where it needs to be.");
     }
     
     int rc = SoapySDRDevice_setFrequencyComponent(soapy_device, SOAPY_SDR_TX, tx->dac, "BB", offset, NULL);

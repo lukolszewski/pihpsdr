@@ -115,8 +115,8 @@ static void get_info(char *driver) {
     t_print("Tx channel full duplex: channel=%d fullduplex=%d\n", i, SoapySDRDevice_getFullDuplex(sdr, SOAPY_SDR_TX, i));
   }
 
-  int sample_rate = 768000;
-  //int sample_rate = 1000000;
+   int sample_rate = 768000;
+  //int sample_rate = 200000;
   SoapySDRRange *rx_rates = SoapySDRDevice_getSampleRateRange(sdr, SOAPY_SDR_RX, 0, &rx_rates_length);
 
   for (size_t i = 0; i < rx_rates_length; i++) {
