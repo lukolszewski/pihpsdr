@@ -74,14 +74,34 @@ static void tx_ant_cb(GtkToggleButton *widget, gpointer data) {
   radio_set_alex_antennas();
 }
 
+// Define a structure to hold both ADC and receiver information
+typedef struct {
+    ADC *adc;
+    RECEIVER *receiver;
+} ReceiverADCInfo;
+
 #ifdef SOAPYSDR
+static void adc_antenna_cb(GtkComboBox *widget, gpointer data) {
+  ReceiverADCInfo *info = (ReceiverADCInfo *)data;
+  ADC *myadc = info->adc;
+  RECEIVER *rx = info->receiver;
+  
+  myadc->antenna = gtk_combo_box_get_active(widget);
+  schedule_high_priority();
+
+  if (device == SOAPYSDR_USB_DEVICE) {
+    soapy_protocol_set_rx_antenna(rx, myadc->antenna);
+  }
+}
+
+// For backward compatibility, keep original function but adapt it
 static void adc0_antenna_cb(GtkComboBox *widget, gpointer data) {
   ADC *myadc = (ADC *)data;
   myadc->antenna = gtk_combo_box_get_active(widget);
   schedule_high_priority();
 
   if (device == SOAPYSDR_USB_DEVICE) {
-    soapy_protocol_set_rx_antenna(active_receiver, adc[0].antenna);
+    soapy_protocol_set_rx_antenna(active_receiver, myadc->antenna);
   }
 }
 
@@ -94,7 +114,6 @@ static void dac0_antenna_cb(GtkComboBox *widget, gpointer data) {
     soapy_protocol_set_tx_antenna(transmitter, mydac->antenna);
   }
 }
-
 #endif
 
 static void show_hf() {
@@ -334,18 +353,40 @@ void ant_menu(GtkWidget *parent) {
     t_print("rx_antennas=%ld\n", radio->info.soapy.rx_antennas);
 
     if (radio->info.soapy.rx_antennas > 0) {
-      GtkWidget *antenna_label = gtk_label_new("RX Antenna:");
-      gtk_widget_set_name(antenna_label, "boldlabel");
-      gtk_grid_attach(GTK_GRID(grid), antenna_label, 0, 1, 1, 1);
-      adc0_antenna_combo_box = gtk_combo_box_text_new();
+      for (int rx = 0; rx < RECEIVERS; rx++) {
+        GtkWidget *antenna_label;
+        if (RECEIVERS == 1) {
+          antenna_label = gtk_label_new("RX Antenna:");
+        } else {
+          char label_text[20];
+          sprintf(label_text, "RX%d Antenna:", rx);
+          antenna_label = gtk_label_new(label_text);
+        }
+        
+        gtk_widget_set_name(antenna_label, "boldlabel");
+        gtk_grid_attach(GTK_GRID(grid), antenna_label, 0, 1 + rx, 1, 1);
+        
+        GtkWidget *adc_antenna_combo_box = gtk_combo_box_text_new();
+        
+        // Store the combo box pointer if it's the first receiver
+        if (rx == 0) {
+          adc0_antenna_combo_box = adc_antenna_combo_box;
+        }
 
-      for (size_t i = 0; i < radio->info.soapy.rx_antennas; i++) {
-        gtk_combo_box_text_append(GTK_COMBO_BOX_TEXT(adc0_antenna_combo_box), NULL, radio->info.soapy.rx_antenna[i]);
+        for (size_t i = 0; i < radio->info.soapy.rx_antennas; i++) {
+          gtk_combo_box_text_append(GTK_COMBO_BOX_TEXT(adc_antenna_combo_box), NULL, radio->info.soapy.rx_antenna[i]);
+        }
+
+        gtk_combo_box_set_active(GTK_COMBO_BOX(adc_antenna_combo_box), adc[rx].antenna);
+        
+        // Create a structure to pass both ADC and receiver information
+        ReceiverADCInfo *info = g_new(ReceiverADCInfo, 1);
+        info->adc = &adc[rx];
+        info->receiver = receiver[rx];
+        
+        g_signal_connect(adc_antenna_combo_box, "changed", G_CALLBACK(adc_antenna_cb), info);
+        my_combo_attach(GTK_GRID(grid), adc_antenna_combo_box, 1, 1 + rx, 1, 1);
       }
-
-      gtk_combo_box_set_active(GTK_COMBO_BOX(adc0_antenna_combo_box), adc[0].antenna);
-      g_signal_connect(adc0_antenna_combo_box, "changed", G_CALLBACK(adc0_antenna_cb), &adc[0]);
-      my_combo_attach(GTK_GRID(grid), adc0_antenna_combo_box, 1, 1, 1, 1);
     }
 
     if (can_transmit) {
@@ -354,7 +395,7 @@ void ant_menu(GtkWidget *parent) {
       if (radio->info.soapy.tx_antennas > 0) {
         GtkWidget *antenna_label = gtk_label_new("TX Antenna:");
         gtk_widget_set_name(antenna_label, "boldlabel");
-        gtk_grid_attach(GTK_GRID(grid), antenna_label, 0, 2, 1, 1);
+        gtk_grid_attach(GTK_GRID(grid), antenna_label, 0, 1 + RECEIVERS, 1, 1);
         dac0_antenna_combo_box = gtk_combo_box_text_new();
 
         for (size_t i = 0; i < radio->info.soapy.tx_antennas; i++) {
@@ -363,7 +404,7 @@ void ant_menu(GtkWidget *parent) {
 
         gtk_combo_box_set_active(GTK_COMBO_BOX(dac0_antenna_combo_box), dac[0].antenna);
         g_signal_connect(dac0_antenna_combo_box, "changed", G_CALLBACK(dac0_antenna_cb), &dac[0]);
-        my_combo_attach(GTK_GRID(grid), dac0_antenna_combo_box, 1, 2, 1, 1);
+        my_combo_attach(GTK_GRID(grid), dac0_antenna_combo_box, 1, 1 + RECEIVERS, 1, 1);
       }
     }
   }

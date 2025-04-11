@@ -458,11 +458,11 @@ void soapy_protocol_start_duplicate_receivers(RECEIVER *rx[]) {
 void soapy_protocol_create_transmitter(TRANSMITTER *tx) {
   int rc;
 
-  t_print("%s: device=%p adc=%d setting bandwidth=%f\n", __FUNCTION__, soapy_device, tx->dac, rx_bandwidth);
-  rc = SoapySDRDevice_setBandwidth(soapy_device, SOAPY_SDR_TX, tx->dac, rx_bandwidth);
+  t_print("%s: device=%p adc=%d setting bandwidth=%f\n", __FUNCTION__, soapy_device, tx->dac, tx_bandwidth);
+  rc = SoapySDRDevice_setBandwidth(soapy_device, SOAPY_SDR_TX, tx->dac, tx_bandwidth);
 
   if (rc != 0) {
-    t_print("%s: SoapySDRDevice_setBandwidth(%f) failed: %s\n", __FUNCTION__, (double)rx_bandwidth, SoapySDR_errToStr(rc));
+    t_print("%s: SoapySDRDevice_setBandwidth(%f) failed: %s\n", __FUNCTION__, (double)tx_bandwidth, SoapySDR_errToStr(rc));
   }
 
   t_print("Writing TX oversampling setting");
@@ -1038,6 +1038,34 @@ void soapy_protocol_set_tx_frequency(TRANSMITTER *tx) {
     SoapySDRKwargs_clear(&args);
   }
 }
+/*
+void soapy_protocol_set_tx_frequency(TRANSMITTER *tx) {
+  int v;
+  v = vfo_get_tx_vfo();
+
+  if (can_transmit && soapy_device != NULL) {
+    double f;
+
+    if (vfo[v].ctun) {
+      f = (double)(vfo[v].ctun_frequency);
+    } else {
+      f = (double)(vfo[v].frequency);
+    }
+
+    if (vfo[v].xit_enabled) {
+      f += (double)(vfo[v].xit);
+    }
+
+    t_print("soapy_protocol_set_tx_frequency: %f\n",f);
+        int rc = SoapySDRDevice_setFrequency(soapy_device, SOAPY_SDR_TX, tx->dac, f, NULL);
+
+    if (rc != 0) {
+      t_print("soapy_protocol: SoapySDRDevice_setFrequency(TX) failed: %s\n", SoapySDR_errToStr(rc));
+    }
+    printFrequencyComponents(soapy_device, SOAPY_SDR_TX, tx->dac);
+  }
+}
+*/
 
 void soapy_protocol_set_rx_antenna(RECEIVER *rx, int ant) {
   if (soapy_device != NULL) {

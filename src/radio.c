@@ -1549,7 +1549,7 @@ void radio_start_radio() {
       soapy_protocol_create_transmitter(transmitter);
       soapy_protocol_set_tx_antenna(transmitter, dac[0].antenna);
       //soapy_protocol_set_tx_gain(transmitter, transmitter->drive);
-      t_print("Setting TX to +34dB before calibration");
+      t_print("Setting TX to +30dB before calibration");
       soapy_protocol_set_tx_gain(transmitter, 30);
       soapy_protocol_set_tx_frequency(transmitter);
       soapy_protocol_start_transmitter(transmitter);
@@ -1564,8 +1564,8 @@ void radio_start_radio() {
         soapy_protocol_set_automatic_gain(rx, adc[i].agc);
         soapy_protocol_set_rx_antenna(rx, adc[i].antenna);
         //if (!adc[i].agc) { soapy_protocol_set_gain(rx); }
-        //soapy_protocol_set_rx_frequency(rx, i == 0 ? VFO_A : VFO_B);
-        soapy_protocol_set_rx_frequency(rx, VFO_A);
+        soapy_protocol_set_rx_frequency(rx, i == 0 ? VFO_A : VFO_B);
+        //soapy_protocol_set_rx_frequency(rx, VFO_A);
         if (vfo[i].ctun) {
           rx_set_frequency(rx, vfo[i].ctun_frequency);
         }
