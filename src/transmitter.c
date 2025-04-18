@@ -100,6 +100,7 @@ static int clear_out_of_band_warning(gpointer data) {
   return G_SOURCE_REMOVE;
 }
 
+
 ///////////////////////////////////////////////////////////////////////////
 // Sine tone generator based on phase words that are
 // passed as an argument. The phase (value 0-256) is encoded in
@@ -2085,9 +2086,42 @@ void tx_off(const TRANSMITTER *tx) {
 #ifdef WDSPTXDEBUG
   t_print("TX id=%d Channel OFF\n", tx->id);
 #endif
+#ifdef SOAPYSDR
+  soapy_protocol_set_tx_gain(transmitter, 0); //set gain to zero
+  soapy_protocol_set_tx_antenna(transmitter, 0); //set antenna to none which disconnects the output
+
+  const char *bank = "MAIN"; //set GPIO to signal the relay to RX
+  t_print("Transmitter:Setting GPIO to 0");
+  SoapySDRDevice *sdr = get_soapy_device();
+  SoapySDRDevice_writeGPIODir(sdr,bank,0xFF);
+  SoapySDRDevice_writeGPIO(sdr,bank, 0x00);
+
+
+for (int i = 0; i < RECEIVERS; i++) {
+    soapy_protocol_unattenuate(receiver[i]); //unattenuate RX (relays for UHF+ are very leaky)
+}
+#endif
 }
 
 void tx_on(const TRANSMITTER *tx) {
+#ifdef SOAPYSDR
+  for (int i = 0; i < RECEIVERS; i++) {
+    soapy_protocol_attenuate(receiver[i]);
+}
+
+
+  SoapySDRDevice *sdr = get_soapy_device();
+  const char *bank = "MAIN";
+
+  t_print("Transmitter:Setting GPIO to 1");
+  
+  SoapySDRDevice_writeGPIODir(sdr,bank,0xFF);
+  SoapySDRDevice_writeGPIO(sdr,bank, 0x01);
+  usleep(30000);
+  soapy_protocol_set_tx_antenna(transmitter, dac.antenna);
+  soapy_protocol_set_tx_gain(transmitter, transmitter->drive);
+#endif
+
   ASSERT_SERVER();
   // switch TX ON
   SetChannelState(tx->id, 1, 0);
@@ -2625,3 +2659,11 @@ void tx_set_twotone(TRANSMITTER *tx, int state) {
   g_idle_add(ext_set_mox, GINT_TO_POINTER(state));
 }
 
+void tx_frequency_changed(TRANSMITTER *tx) {
+
+  #if SOAPYSDR
+  if(protocol == SOAPYSDR_PROTOCOL) {
+    soapy_protocol_set_tx_frequency(tx);
+  }
+  #endif
+}

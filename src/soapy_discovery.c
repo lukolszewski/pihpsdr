@@ -199,58 +199,87 @@ static void get_info(char *driver) {
     }
   }
 
-  if (devices < MAX_DEVICES) {
-    discovered[devices].device = SOAPYSDR_USB_DEVICE;
-    discovered[devices].protocol = SOAPYSDR_PROTOCOL;
-    snprintf(discovered[devices].name, sizeof(discovered[devices].name), "%s", driver);
-    discovered[devices].supported_receivers = rx_channels;
-    discovered[devices].supported_transmitters = tx_channels;
-    discovered[devices].adcs = rx_channels;
-    discovered[devices].dacs = tx_channels;
-    discovered[devices].status = STATE_AVAILABLE;
-    discovered[devices].software_version = software_version;
-    discovered[devices].frequency_min = ranges[0].minimum;
-    discovered[devices].frequency_max = ranges[0].maximum;
-    snprintf(discovered[devices].info.soapy.driver_key, sizeof(discovered[devices].info.soapy.driver_key), "%s",
-             driverkey);
-    snprintf(discovered[devices].info.soapy.hardware_key, sizeof(discovered[devices].info.soapy.hardware_key), "%s",
-             hardwarekey);
-    discovered[devices].info.soapy.sample_rate = sample_rate;
+if (devices < MAX_DEVICES) {
+  discovered[devices].device = SOAPYSDR_USB_DEVICE;
+  discovered[devices].protocol = SOAPYSDR_PROTOCOL;
+  snprintf(discovered[devices].name, sizeof(discovered[devices].name), "%s", driver);
+  discovered[devices].supported_receivers = rx_channels;
+  discovered[devices].supported_transmitters = tx_channels;
+  discovered[devices].adcs = rx_channels;
+  discovered[devices].dacs = tx_channels;
+  discovered[devices].status = STATE_AVAILABLE;
+  discovered[devices].software_version = software_version;
+  discovered[devices].frequency_min = ranges[0].minimum;
+  discovered[devices].frequency_max = ranges[0].maximum;
+  snprintf(discovered[devices].info.soapy.driver_key, sizeof(discovered[devices].info.soapy.driver_key), "%s",
+           driverkey);
+  snprintf(discovered[devices].info.soapy.hardware_key, sizeof(discovered[devices].info.soapy.hardware_key), "%s",
+           hardwarekey);
+  discovered[devices].info.soapy.sample_rate = sample_rate;
 
-    if (strcmp(driver, "rtlsdr") == 0) {
-      discovered[devices].info.soapy.rtlsdr_count = rtlsdr_val;
-      discovered[devices].info.soapy.sdrplay_count = 0;
-    } else if (strcmp(driver, "sdrplay") == 0) {
-      discovered[devices].info.soapy.rtlsdr_count = 0;
-      discovered[devices].info.soapy.sdrplay_count = sdrplay_val;
-    } else {
-      discovered[devices].info.soapy.rtlsdr_count = 0;
-      discovered[devices].info.soapy.sdrplay_count = 0;
+  if (strcmp(driver, "rtlsdr") == 0) {
+    discovered[devices].info.soapy.rtlsdr_count = rtlsdr_val;
+    discovered[devices].info.soapy.sdrplay_count = 0;
+  } else if (strcmp(driver, "sdrplay") == 0) {
+    discovered[devices].info.soapy.rtlsdr_count = 0;
+    discovered[devices].info.soapy.sdrplay_count = sdrplay_val;
+  } else {
+    discovered[devices].info.soapy.rtlsdr_count = 0;
+    discovered[devices].info.soapy.sdrplay_count = 0;
+  }
+
+  if (strcmp(driver, "lime") == 0) {
+    snprintf(discovered[devices].info.soapy.version, sizeof(discovered[devices].info.soapy.version),
+             "fw=%s gw=%s hw=%s p=%s", fw_version, gw_version, hw_version,
+             p_version);
+  } else if (strcmp(driver, "radioberry") == 0) {
+    snprintf(discovered[devices].info.soapy.version, sizeof(discovered[devices].info.soapy.version),
+             "fw=%s gw=%s", fw_version, gw_version);
+  } else {
+    snprintf(discovered[devices].info.soapy.version, sizeof(discovered[devices].info.soapy.version), "%s", "");
+  }
+
+  //
+  // Client/Server version:
+  // The RX/TX gains and antennas are now stored in "radio" in a fixed place,
+  // where we have up to 8 strings of max length (including trailing zero) of 64
+  //
+  if (rx_gains_length > 8) { rx_gains_length = 8; }
+
+  if (rx_antennas_length > 8) { rx_antennas_length = 8; }
+
+  discovered[devices].info.soapy.rx_channels = rx_channels;
+  discovered[devices].info.soapy.rx_gains = rx_gains_length;
+
+  // Handle LimeSDR overall gain first if applicable
+  if (strcmp(driver, "lime") == 0) {
+    // Get the overall gain range for LimeSDR
+    SoapySDRRange overall_range = SoapySDRDevice_getGainRange(sdr, SOAPY_SDR_RX, 0);
+    t_print("RX gain available: overall, %f -> %f step=%f\n", overall_range.minimum, overall_range.maximum, overall_range.step);
+    
+    // Store the overall gain as the first gain
+    snprintf(discovered[devices].info.soapy.rx_gain[0], 64, "Combined");
+    discovered[devices].info.soapy.rx_range_step[0] = overall_range.step;
+    discovered[devices].info.soapy.rx_range_min[0] = overall_range.minimum;
+    discovered[devices].info.soapy.rx_range_max[0] = overall_range.maximum;
+    
+    // Now store the individual gain components
+    for (size_t i = 0; i < rx_gains_length && i < 7; i++) {  // Max 7 to leave room for overall
+      SoapySDRRange rx_range = SoapySDRDevice_getGainElementRange(sdr, SOAPY_SDR_RX, 0, rx_gains[i]);
+      t_print("RX gain available: %s, %f -> %f step=%f\n", rx_gains[i], rx_range.minimum, rx_range.maximum, rx_range.step);
+      snprintf(discovered[devices].info.soapy.rx_gain[i+1], 64, "%s", rx_gains[i]);
+      discovered[devices].info.soapy.rx_range_step[i+1] = rx_range.step;
+      discovered[devices].info.soapy.rx_range_min[i+1] = rx_range.minimum;
+      discovered[devices].info.soapy.rx_range_max[i+1] = rx_range.maximum;
     }
-
-    if (strcmp(driver, "lime") == 0) {
-      snprintf(discovered[devices].info.soapy.version, sizeof(discovered[devices].info.soapy.version),
-               "fw=%s gw=%s hw=%s p=%s", fw_version, gw_version, hw_version,
-               p_version);
-    } else if (strcmp(driver, "radioberry") == 0) {
-      snprintf(discovered[devices].info.soapy.version, sizeof(discovered[devices].info.soapy.version),
-               "fw=%s gw=%s", fw_version, gw_version);
-    } else {
-      snprintf(discovered[devices].info.soapy.version, sizeof(discovered[devices].info.soapy.version), "%s", "");
+    
+    // Update the gain count to include the overall gain
+    discovered[devices].info.soapy.rx_gains = rx_gains_length + 1;
+    if (discovered[devices].info.soapy.rx_gains > 8) {
+      discovered[devices].info.soapy.rx_gains = 8;
     }
-
-    //
-    // Client/Server version:
-    // The RX/TX gains and antennas are now stored in "radio" in a fixed place,
-    // where we have up to 8 strings of max length (including trailing zero) of 64
-    //
-    if (rx_gains_length > 8) { rx_gains_length = 8; }
-
-    if (rx_antennas_length > 8) { rx_antennas_length = 8; }
-
-    discovered[devices].info.soapy.rx_channels = rx_channels;
-    discovered[devices].info.soapy.rx_gains = rx_gains_length;
-
+  } else {
+    // For non-Lime devices, handle gains as before
     for (size_t i = 0; i < rx_gains_length; i++) {
       SoapySDRRange rx_range = SoapySDRDevice_getGainElementRange(sdr, SOAPY_SDR_RX, 0, rx_gains[i]);
       t_print("RX gain available: %s, %f -> %f step=%f\n", rx_gains[i], rx_range.minimum, rx_range.maximum, rx_range.step);
@@ -259,23 +288,53 @@ static void get_info(char *driver) {
       discovered[devices].info.soapy.rx_range_min[i] = rx_range.minimum;
       discovered[devices].info.soapy.rx_range_max[i] = rx_range.maximum;
     }
+  }
 
-    discovered[devices].info.soapy.rx_has_automatic_gain = has_automatic_gain;
-    discovered[devices].info.soapy.rx_has_automatic_dc_offset_correction = has_automatic_dc_offset_correction;
-    discovered[devices].info.soapy.rx_antennas = rx_antennas_length;
-    discovered[devices].info.soapy.tx_channels = tx_channels;
+  discovered[devices].info.soapy.rx_has_automatic_gain = has_automatic_gain;
+  discovered[devices].info.soapy.rx_has_automatic_dc_offset_correction = has_automatic_dc_offset_correction;
+  discovered[devices].info.soapy.rx_antennas = rx_antennas_length;
+  discovered[devices].info.soapy.tx_channels = tx_channels;
 
-    for (size_t i = 0; i < rx_antennas_length; i++) {
-      snprintf(discovered[devices].info.soapy.rx_antenna[i], 64, "%s", rx_antennas[i]);
-    }
+  for (size_t i = 0; i < rx_antennas_length; i++) {
+    snprintf(discovered[devices].info.soapy.rx_antenna[i], 64, "%s", rx_antennas[i]);
+  }
 
-    if (tx_channels > 0) {
-      char **tx_gains = SoapySDRDevice_listGains(sdr, SOAPY_SDR_TX, 0, &tx_gains_length);
+  if (tx_channels > 0) {
+    char **tx_gains = SoapySDRDevice_listGains(sdr, SOAPY_SDR_TX, 0, &tx_gains_length);
 
-      if (tx_gains_length > 8) { tx_gains_length = 8; }
+    if (tx_gains_length > 8) { tx_gains_length = 8; }
 
-      discovered[devices].info.soapy.tx_gains = tx_gains_length;
+    discovered[devices].info.soapy.tx_gains = tx_gains_length;
 
+    // Handle LimeSDR TX overall gain if applicable
+    if (strcmp(driver, "lime") == 0) {
+      // Get the overall gain range for LimeSDR TX
+      SoapySDRRange overall_tx_range = SoapySDRDevice_getGainRange(sdr, SOAPY_SDR_TX, 0);
+      t_print("TX gain available: overall, %f -> %f step=%f\n", overall_tx_range.minimum, overall_tx_range.maximum, overall_tx_range.step);
+      
+      // Store the overall gain as the first gain
+      snprintf(discovered[devices].info.soapy.tx_gain[0], 64, "Combined");
+      discovered[devices].info.soapy.tx_range_step[0] = overall_tx_range.step;
+      discovered[devices].info.soapy.tx_range_min[0] = overall_tx_range.minimum;
+      discovered[devices].info.soapy.tx_range_max[0] = overall_tx_range.maximum;
+      
+      // Now store the individual gain components
+      for (size_t i = 0; i < tx_gains_length && i < 7; i++) {  // Max 7 to leave room for overall
+        SoapySDRRange tx_range = SoapySDRDevice_getGainElementRange(sdr, SOAPY_SDR_TX, 0, tx_gains[i]);
+        t_print("TX gain %s, %f -> %f step=%f\n", tx_gains[i], tx_range.minimum, tx_range.maximum, tx_range.step);
+        snprintf(discovered[devices].info.soapy.tx_gain[i+1], 64, "%s", tx_gains[i]);
+        discovered[devices].info.soapy.tx_range_step[i+1] = tx_range.step;
+        discovered[devices].info.soapy.tx_range_min[i+1] = tx_range.minimum;
+        discovered[devices].info.soapy.tx_range_max[i+1] = tx_range.maximum;
+      }
+      
+      // Update the gain count to include the overall gain
+      discovered[devices].info.soapy.tx_gains = tx_gains_length + 1;
+      if (discovered[devices].info.soapy.tx_gains > 8) {
+        discovered[devices].info.soapy.tx_gains = 8;
+      }
+    } else {
+      // For non-Lime devices, handle TX gains as before
       for (size_t i = 0; i < tx_gains_length; i++) {
         SoapySDRRange tx_range = SoapySDRDevice_getGainElementRange(sdr, SOAPY_SDR_TX, 0, tx_gains[i]);
         t_print("TX gain %s, %f -> %f step=%f\n", tx_gains[i], tx_range.minimum, tx_range.maximum, tx_range.step);
@@ -284,34 +343,35 @@ static void get_info(char *driver) {
         discovered[devices].info.soapy.tx_range_min[i] = tx_range.minimum;
         discovered[devices].info.soapy.tx_range_max[i] = tx_range.maximum;
       }
-
-      char **tx_antennas = SoapySDRDevice_listAntennas(sdr, SOAPY_SDR_TX, 0, &tx_antennas_length);
-
-      if (tx_antennas_length > 8) { tx_antennas_length = 8; }
-
-      discovered[devices].info.soapy.tx_antennas = tx_antennas_length;
-
-      for (size_t i = 0; i < tx_antennas_length; i++) {
-        t_print( "TX antenna: %s\n", tx_antennas[i]);
-        snprintf(discovered[devices].info.soapy.tx_antenna[i], 64, "%s", tx_antennas[i]);
-      }
     }
 
-    discovered[devices].info.soapy.sensors = sensors;
-    discovered[devices].info.soapy.sensor = sensor;
-    discovered[devices].info.soapy.has_temp = has_temp;
+    char **tx_antennas = SoapySDRDevice_listAntennas(sdr, SOAPY_SDR_TX, 0, &tx_antennas_length);
 
-    if (address != NULL) {
-      snprintf(discovered[devices].info.soapy.address, sizeof(discovered[devices].info.soapy.address), "%s", address);
-    } else {
-      snprintf(discovered[devices].info.soapy.address, sizeof(discovered[devices].info.soapy.address), "USB");
+    if (tx_antennas_length > 8) { tx_antennas_length = 8; }
+
+    discovered[devices].info.soapy.tx_antennas = tx_antennas_length;
+
+    for (size_t i = 0; i < tx_antennas_length; i++) {
+      t_print( "TX antenna: %s\n", tx_antennas[i]);
+      snprintf(discovered[devices].info.soapy.tx_antenna[i], 64, "%s", tx_antennas[i]);
     }
-
-    t_print("soapy_discovery: name=%s min=%0.3f MHz max=%0.3f MHz\n", discovered[devices].name,
-            discovered[devices].frequency_min * 1E-6,
-            discovered[devices].frequency_max * 1E-6);
-    devices++;
   }
+
+  discovered[devices].info.soapy.sensors = sensors;
+  discovered[devices].info.soapy.sensor = sensor;
+  discovered[devices].info.soapy.has_temp = has_temp;
+
+  if (address != NULL) {
+    snprintf(discovered[devices].info.soapy.address, sizeof(discovered[devices].info.soapy.address), "%s", address);
+  } else {
+    snprintf(discovered[devices].info.soapy.address, sizeof(discovered[devices].info.soapy.address), "USB");
+  }
+
+  t_print("soapy_discovery: name=%s min=%0.3f MHz max=%0.3f MHz\n", discovered[devices].name,
+          discovered[devices].frequency_min * 1E-6,
+          discovered[devices].frequency_max * 1E-6);
+  devices++;
+}
 
   SoapySDRDevice_unmake(sdr);
   free(ranges);

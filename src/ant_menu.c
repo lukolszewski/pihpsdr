@@ -91,7 +91,7 @@ static void adc_antenna_cb(GtkComboBox *widget, gpointer data) {
       send_soapy_rxant(client_socket);
     } else {
 #ifdef SOAPYSDR
-      soapy_protocol_set_rx_antenna(receiver[0], adc[0].antenna);
+      soapy_protocol_set_rx_antenna(active_receiver, adc[0].antenna);
 #endif
     }
   }
@@ -105,7 +105,9 @@ static void dac_antenna_cb(GtkComboBox *widget, gpointer data) {
       send_soapy_txant(client_socket);
     } else {
 #ifdef SOAPYSDR
-      soapy_protocol_set_tx_antenna(transmitter, dac.antenna);
+      if (can_transmit && radio_is_transmitting()) {
+        soapy_protocol_set_tx_antenna(transmitter, dac.antenna);
+      }
 #endif
     }
   }

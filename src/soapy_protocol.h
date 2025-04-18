@@ -21,11 +21,28 @@
 
 #include "receiver.h"
 #include "transmitter.h"
+extern double lo_frequency;
 
 SoapySDRDevice *get_soapy_device(void);
 
+typedef struct {
+    double lower_bound;   // in Hz
+    double upper_bound;   // in Hz
+    double lo_frequency;  // in Hz
+} Band;
+
+extern Band bands[];
+
+double get_lo_frequency(double freq_hz);
+
 void soapy_protocol_create_receiver(RECEIVER *rx);
 void soapy_protocol_start_receiver(RECEIVER *rx);
+
+void soapy_protocol_create_receivers(RECEIVER *rx[]);
+void soapy_protocol_start_receivers(RECEIVER *rx[]);
+
+void soapy_protocol_create_duplicate_receivers(RECEIVER *rx[]);
+void soapy_protocol_start_duplicate_receivers(RECEIVER *rx[]);
 
 void soapy_protocol_init(gboolean hf);
 void soapy_protocol_stop(void);
@@ -34,6 +51,8 @@ void soapy_protocol_set_rx_frequency(RECEIVER *rx, int v);
 void soapy_protocol_set_rx_antenna(RECEIVER *rx, int ant);
 void soapy_protocol_set_lna_gain(RECEIVER *rx, int gain);
 void soapy_protocol_set_gain(RECEIVER *rx);
+void soapy_protocol_attenuate(RECEIVER *rx);
+void soapy_protocol_unattenuate(RECEIVER *rx); 
 void soapy_protocol_set_gain_element(const RECEIVER *rx, char *name, int gain);
 int soapy_protocol_get_gain_element(RECEIVER *rx, char *name);
 void soapy_protocol_change_sample_rate(RECEIVER *rx);

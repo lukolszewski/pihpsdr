@@ -1424,7 +1424,11 @@ void radio_start_radio() {
   //
   if (device == SOAPYSDR_USB_DEVICE) {
     soapy_iqswap = 1;
-    receivers = 1;
+    if (strcmp(radio->name, "lime") == 0) {
+      receivers = 2;
+    }else{
+      receivers = 1;
+    }
     filter_board = NO_FILTER_BOARD;
   }
 
@@ -1517,9 +1521,17 @@ void radio_start_radio() {
   switch (protocol) {
   case SOAPYSDR_PROTOCOL:
     t_print("%s: setup RECEIVERS SOAPYSDR\n", __FUNCTION__);
-    RECEIVERS = 1;
-    PS_TX_FEEDBACK = 1;
-    PS_RX_FEEDBACK = 2;
+    if(strcmp(radio->name, "lime") == 0) {
+      t_print("Aplying LimeSDR settings.");
+      RECEIVERS = 2;
+      PS_TX_FEEDBACK = (RECEIVERS);
+      PS_RX_FEEDBACK = (RECEIVERS + 1);
+    } else {
+      t_print("Generic SoapySDR settings.");
+      RECEIVERS = 1;
+      PS_TX_FEEDBACK = 1;
+      PS_RX_FEEDBACK = 2;
+    }
     break;
 
   default:
@@ -1566,25 +1578,67 @@ void radio_start_radio() {
   if (protocol == SOAPYSDR_PROTOCOL) {
     RECEIVER *rx = receiver[0];
 #ifdef SOAPYSDR
-    soapy_protocol_create_receiver(rx);
+    if(strcmp(radio->name, "lime") != 0) { //with lime we have to create the TX first for some reason.
+      soapy_protocol_create_receiver(rx);
+    }
 #endif
 
     if (can_transmit) {
 #ifdef SOAPYSDR
       soapy_protocol_create_transmitter(transmitter);
       soapy_protocol_set_tx_antenna(transmitter, dac.antenna);
-      soapy_protocol_set_tx_gain(transmitter, transmitter->drive);
+      if(strcmp(radio->name, "lime") == 0) {
+        t_print("Setting TX to +30dB before calibration");
+        soapy_protocol_set_tx_gain(transmitter, 30);
+      }else{
+        soapy_protocol_set_tx_gain(transmitter, transmitter->drive);
+      }
       soapy_protocol_set_tx_frequency(transmitter);
       soapy_protocol_start_transmitter(transmitter);
+      if(strcmp(radio->name, "lime") == 0) {
+        t_print("Setting TX to 0dB to avoid LO leak");
+        soapy_protocol_set_tx_gain(transmitter, 0); 
+      }
 #endif
     }
 
 #ifdef SOAPYSDR
-    soapy_protocol_set_rx_antenna(rx, adc[0].antenna);
-    soapy_protocol_set_rx_frequency(rx, VFO_A);
-    soapy_protocol_set_automatic_gain(rx, adc[0].agc);
 
-    if (!adc[0].agc) { soapy_protocol_set_gain(rx); }
+    for (int i = 0; i < RECEIVERS; i++) {
+        RECEIVER *rx = receiver[i];
+
+        
+        soapy_protocol_set_automatic_gain(rx, adc[i].agc);
+        soapy_protocol_set_rx_antenna(rx, adc[i].antenna);
+        //if (!adc[i].agc) { soapy_protocol_set_gain(rx); }
+        soapy_protocol_set_rx_frequency(rx, i == 0 ? VFO_A : VFO_B);
+        //soapy_protocol_set_rx_frequency(rx, VFO_A);
+        if (vfo[i].ctun) {
+          rx_set_frequency(rx, vfo[i].ctun_frequency);
+      }
+    }
+
+    if(RECEIVERS == 1) {
+      //soapy_protocol_set_automatic_gain(receiver[0], adc[0].agc);
+      //soapy_protocol_set_rx_antenna(receiver[0], adc[0].antenna);
+      soapy_protocol_create_receiver(receiver[0]);
+      soapy_protocol_start_receiver(receiver[0]);
+      if (!adc[0].agc) { soapy_protocol_set_gain(rx); }
+      //soapy_protocol_set_gain(receiver[0]); 
+    } else {
+      //soapy_protocol_create_receivers(receiver);
+      //soapy_protocol_start_receivers(receiver);
+      soapy_protocol_create_receivers(receiver);
+      soapy_protocol_start_receivers(receiver);
+      for (int i = 0; i < RECEIVERS; i++) {
+        RECEIVER *rx = receiver[i]; 
+        if (!adc[0].agc) { soapy_protocol_set_gain(rx); }
+        }
+      }
+    
+
+
+    
 
 #endif
 
@@ -1593,9 +1647,9 @@ void radio_start_radio() {
     }
 
 #ifdef SOAPYSDR
-    soapy_protocol_start_receiver(rx);
+    //soapy_protocol_start_receiver(rx);
     //t_print("radio: set rf_gain=%f\n",rx->rf_gain);
-    soapy_protocol_set_gain(rx);
+    //soapy_protocol_set_gain(rx);
 #endif
   }
 
@@ -2445,7 +2499,13 @@ void radio_set_drive(double value) {
 
   case SOAPYSDR_PROTOCOL:
 #ifdef SOAPYSDR
+if (strcmp(radio->name, "lime") == 0) {
+    if(radio_is_transmitting()) {
+      soapy_protocol_set_tx_gain(transmitter, transmitter->drive);
+    }
+  }else{
     soapy_protocol_set_tx_gain(transmitter, transmitter->drive);
+  }
 #endif
     break;
   }
