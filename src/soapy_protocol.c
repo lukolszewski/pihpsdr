@@ -692,14 +692,13 @@ static void *receive_thread(void *arg) {
   return NULL;
 }
 
-
 static gpointer receive_dual_thread(gpointer data) {
+  ASSERT_SERVER(NULL);
   RECEIVER **rx = (RECEIVER **)data;
   int flags = 0;
   long long timeNs = 0;
   long timeoutUs = 100000L;
   int i, j;
-  float fsample;
   double isample, qsample;
 
   t_print("soapy_protocol: receive_dual_thread\n");
@@ -733,7 +732,7 @@ static gpointer receive_dual_thread(gpointer data) {
       }
     }
 
-    // Now process each receiver's samples separately without microphone handling
+    // Process each receiver's samples
     for (i = 0; i < RECEIVERS; ++i) {
       if (!rx[i]) continue;
 
@@ -749,6 +748,16 @@ static gpointer receive_dual_thread(gpointer data) {
           } else {
             rx_add_iq_samples(rx[i], isample, qsample);
           }
+          
+          // Process mic samples in the same loop that processes IQ samples
+          if (can_transmit) {
+            mic_samples++;
+            if (mic_samples >= mic_sample_divisor) {
+              // This call sets the heartbeat, not actually using mic samples
+              tx_add_mic_sample(transmitter, 0);
+              mic_samples = 0;
+            }
+          }
         }
       } else {
         for (j = 0; j < elements; ++j) {
@@ -760,26 +769,21 @@ static gpointer receive_dual_thread(gpointer data) {
           } else {
             rx_add_iq_samples(rx[i], isample, qsample);
           }
-        }
-      }
-    }
-
-    // Handle microphone sampling once per batch of SDR samples
-    // This ensures consistent microphone timing regardless of number of receivers
-    if (can_transmit) {
-      // We need to increment mic_samples once for each original IQ sample
-      for (j = 0; j < elements; j++) {
-        mic_samples++;
-        if (mic_samples >= mic_sample_divisor) {
-          if (transmitter != NULL) {
-            fsample = transmitter->local_microphone ? audio_get_next_mic_sample() : 0.0F;
-          } else {
-            fsample = 0.0F;
+          
+          // Process mic samples in the same loop that processes IQ samples
+          if (can_transmit) {
+            mic_samples++;
+            if (mic_samples >= mic_sample_divisor) {
+              // This call sets the heartbeat, not actually using mic samples
+              tx_add_mic_sample(transmitter, 0);
+              mic_samples = 0;
+            }
           }
-          tx_add_mic_sample(transmitter, fsample);
-          mic_samples = 0;
         }
       }
+      
+      // Only process one receiver's worth of mic samples
+      break;
     }
   }
 
@@ -794,12 +798,12 @@ static gpointer receive_dual_thread(gpointer data) {
 }
 
 static gpointer receive_dupli_thread(gpointer data) {
+  ASSERT_SERVER(NULL);
   RECEIVER **rx = (RECEIVER **)data;
   int flags = 0;
   long long timeNs = 0;
   long timeoutUs = 100000L;
   int i, j;
-  float fsample;
   double isample, qsample;
 
   t_print("soapy_protocol: receive_dupli_thread\n");
@@ -830,8 +834,59 @@ static gpointer receive_dupli_thread(gpointer data) {
       }
     }
 
-    // Process each receiver's samples
-    for (j = 0; j < RECEIVERS; ++j) {
+    // Process only the first receiver's samples for timing purposes
+    for (j = 0; j < 1; ++j) {
+      if (!rx[j]) continue;
+
+      if (rx[j]->resampler != NULL) {
+        int samples = xresample(rx[j]->resampler);
+
+        for (i = 0; i < samples; ++i) {
+          isample = rx[j]->resample_buffer[i * 2];
+          qsample = rx[j]->resample_buffer[i * 2 + 1];
+
+          if (soapy_iqswap) {
+            rx_add_iq_samples(rx[j], qsample, isample);
+          } else {
+            rx_add_iq_samples(rx[j], isample, qsample);
+          }
+          
+          // Process mic samples in the same loop
+          if (can_transmit) {
+            mic_samples++;
+            if (mic_samples >= mic_sample_divisor) {
+              // This call sets the heartbeat, not actually using mic samples
+              tx_add_mic_sample(transmitter, 0);
+              mic_samples = 0;
+            }
+          }
+        }
+      } else {
+        for (i = 0; i < elements; ++i) {
+          isample = rx[j]->buffer[i * 2];
+          qsample = rx[j]->buffer[i * 2 + 1];
+
+          if (soapy_iqswap) {
+            rx_add_iq_samples(rx[j], qsample, isample);
+          } else {
+            rx_add_iq_samples(rx[j], isample, qsample);
+          }
+          
+          // Process mic samples in the same loop
+          if (can_transmit) {
+            mic_samples++;
+            if (mic_samples >= mic_sample_divisor) {
+              // This call sets the heartbeat, not actually using mic samples
+              tx_add_mic_sample(transmitter, 0);
+              mic_samples = 0;
+            }
+          }
+        }
+      }
+    }
+    
+    // Now process the rest of the receivers without mic sampling
+    for (j = 1; j < RECEIVERS; ++j) {
       if (!rx[j]) continue;
 
       if (rx[j]->resampler != NULL) {
@@ -857,24 +912,6 @@ static gpointer receive_dupli_thread(gpointer data) {
           } else {
             rx_add_iq_samples(rx[j], isample, qsample);
           }
-        }
-      }
-    }
-
-    // Handle microphone sampling once per batch of SDR samples
-    // This ensures consistent microphone timing regardless of number of receivers
-    if (can_transmit) {
-      // We need to increment mic_samples once for each original IQ sample
-      for (i = 0; i < elements; i++) {
-        mic_samples++;
-        if (mic_samples >= mic_sample_divisor) {
-          if (transmitter != NULL) {
-            fsample = transmitter->local_microphone ? audio_get_next_mic_sample() : 0.0F;
-          } else {
-            fsample = 0.0F;
-          }
-          tx_add_mic_sample(transmitter, fsample);
-          mic_samples = 0;
         }
       }
     }
