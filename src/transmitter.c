@@ -2087,39 +2087,44 @@ void tx_off(const TRANSMITTER *tx) {
   t_print("TX id=%d Channel OFF\n", tx->id);
 #endif
 #ifdef SOAPYSDR
-  soapy_protocol_set_tx_gain(transmitter, 0); //set gain to zero
-  soapy_protocol_set_tx_antenna(transmitter, 0); //set antenna to none which disconnects the output
+if (strcmp(radio->name, "lime") == 0) {
+    soapy_protocol_set_tx_gain(transmitter, 0); //set gain to zero
+    soapy_protocol_set_tx_antenna(transmitter, 0); //set antenna to none which disconnects the output
 
-  const char *bank = "MAIN"; //set GPIO to signal the relay to RX
-  t_print("Transmitter:Setting GPIO to 0");
-  SoapySDRDevice *sdr = get_soapy_device();
-  SoapySDRDevice_writeGPIODir(sdr,bank,0xFF);
-  SoapySDRDevice_writeGPIO(sdr,bank, 0x00);
+    const char *bank = "MAIN"; //set GPIO to signal the relay to RX
+    t_print("Transmitter:Setting GPIO to 0");
+    SoapySDRDevice *sdr = get_soapy_device();
+    SoapySDRDevice_writeGPIODir(sdr,bank,0xFF);
+    SoapySDRDevice_writeGPIO(sdr,bank, 0x00);
 
 
-for (int i = 0; i < RECEIVERS; i++) {
-    soapy_protocol_unattenuate(receiver[i]); //unattenuate RX (relays for UHF+ are very leaky)
+  for (int i = 0; i < RECEIVERS; i++) {
+      soapy_protocol_unattenuate(receiver[i]); //unattenuate RX (relays for UHF+ are very leaky)
+  }
 }
 #endif
 }
 
 void tx_on(const TRANSMITTER *tx) {
+
 #ifdef SOAPYSDR
-  for (int i = 0; i < RECEIVERS; i++) {
-    soapy_protocol_attenuate(receiver[i]);
+if (strcmp(radio->name, "lime") == 0) {
+    for (int i = 0; i < RECEIVERS; i++) {
+      soapy_protocol_attenuate(receiver[i]);
+  }
+
+
+    SoapySDRDevice *sdr = get_soapy_device();
+    const char *bank = "MAIN";
+
+    t_print("Transmitter:Setting GPIO to 1");
+    
+    SoapySDRDevice_writeGPIODir(sdr,bank,0xFF);
+    SoapySDRDevice_writeGPIO(sdr,bank, 0x01);
+    usleep(30000);
+    soapy_protocol_set_tx_antenna(transmitter, dac.antenna);
+    soapy_protocol_set_tx_gain(transmitter, transmitter->drive);
 }
-
-
-  SoapySDRDevice *sdr = get_soapy_device();
-  const char *bank = "MAIN";
-
-  t_print("Transmitter:Setting GPIO to 1");
-  
-  SoapySDRDevice_writeGPIODir(sdr,bank,0xFF);
-  SoapySDRDevice_writeGPIO(sdr,bank, 0x01);
-  usleep(30000);
-  soapy_protocol_set_tx_antenna(transmitter, dac.antenna);
-  soapy_protocol_set_tx_gain(transmitter, transmitter->drive);
 #endif
 
   ASSERT_SERVER();
